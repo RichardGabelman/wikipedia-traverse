@@ -19,6 +19,11 @@ nlp = spacy.load("en_core_web_lg")
 def url_to_title(url):
   return url.rsplit('/', 1)[-1].replace("_", " ")
 
+def extract_article_url(href):
+  # Strip any in-page anchor (#Section)
+  clean_href = href.split("#")[0]
+  return WIKIPEDIA_BASE_URL + clean_href
+
 def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
   # Parse the targetURL for the semantic meaning of the title
   targetTitle = url_to_title(targetURL)
@@ -59,7 +64,7 @@ def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
           (linkHref.find("wikidata") != -1) or
           (linkHref.find("/Help:") != -1)):
         continue
-      linkURL = WIKIPEDIA_BASE_URL + linkHref
+      linkURL = extract_article_url(linkHref)
       # 3c. In order to prevent loops, I prevent the
       # program from looking at links to pages
       # we've already traversed
