@@ -50,9 +50,14 @@ def extract_article_url(href):
     return WIKIPEDIA_BASE_URL + clean_href
 
 
-def fetch_page(url):
-    response = requests.get(url)
-    return BeautifulSoup(response.content, "html.parser")
+def fetch_page(url, session):
+    try:
+        response = session.get(url, timeout=10)
+        response.raise_for_status()
+        return BeautifulSoup(response.content, "html.parser")
+    except requests.RequestException as exc:
+        print(exc)
+        return None
 
 
 def extract_article_links(soup):
@@ -90,6 +95,9 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
     # Path keeps track of the pages we ultimately visit
     path = [current_url]
 
+    session = requests.Session()
+    session.headers.update({"User-Agent": "WikiTraversal/2.0 (education project)"})
+
     for step in range(step_limit):
         # 1. Determine if current URL is the target URL
         if current_url == target_url:
@@ -98,7 +106,7 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
             return 1
 
         # 2. Go to valid URL
-        soup = fetch_page(current_url)
+        soup = fetch_page(current_url, session)
 
         # 3a. Collect links
         links = extract_article_links(soup)
@@ -118,7 +126,7 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
                 semantic_similarity = similarity_score
                 current_url = link
         path.append(current_url)
-        sleep(1)
+        sleep(5)
 
     print("Failure! Traversal limit exceeded!")
     print(path)
