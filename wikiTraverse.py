@@ -82,7 +82,7 @@ def score_candidate(candidate_url, target_doc):
     return similarity
 
 
-def traverseWiki(start_url, target_url, limit=DEFAULT_STEP_LIMIT):
+def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
     # Parse the targetURL for the semantic meaning of the title
     target_title = url_to_title(target_url)
     target_doc = nlp(target_title)
@@ -90,7 +90,7 @@ def traverseWiki(start_url, target_url, limit=DEFAULT_STEP_LIMIT):
     # Path keeps track of the pages we ultimately visit
     path = [current_url]
 
-    for i in range(limit):
+    for step in range(step_limit):
         # 1. Determine if current URL is the target URL
         if current_url == target_url:
             print("Success!")
