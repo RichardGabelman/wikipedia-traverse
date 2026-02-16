@@ -75,27 +75,27 @@ def extract_article_links(soup):
     return links
 
 
-def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
+def traverseWiki(start_url, target_url, limit=DEFAULT_STEP_LIMIT):
     # Parse the targetURL for the semantic meaning of the title
-    targetTitle = url_to_title(targetURL)
-    targetSemantic = nlp(targetTitle)
-    currentURL = startURL
+    target_title = url_to_title(target_url)
+    target_semantic = nlp(target_title)
+    current_url = start_url
     # Path keeps track of the pages we ultimately visit
-    path = [currentURL]
+    path = [current_url]
 
     for i in range(limit):
         # 1. Determine if current URL is the target URL
-        if currentURL == targetURL:
+        if current_url == target_url:
             print("Success!")
             print(path)
             return 1
 
         # 2. Go to valid URL
-        soup = fetch_page(currentURL)
+        soup = fetch_page(current_url)
 
         # 3a. Collect links
         links = extract_article_links(soup)
-        semanticSimilarity = 0
+        semantic_similarity = 0
 
         for link in links:
             # 3b. In order to prevent loops, I prevent the
@@ -106,14 +106,14 @@ def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
             # 4. Parsing links for article titles
             current_title = url_to_title(link)
             # 5a. Run a semantic comparison on each article title with the target article title
-            currentSemantic = nlp(current_title)
-            similarity = targetSemantic.similarity(currentSemantic)
+            current_semantic = nlp(current_title)
+            similarity = target_semantic.similarity(current_semantic)
             # 5b/6. Keep track (and eventually go to) the page with the highest semantic similarity
-            if similarity > semanticSimilarity:
+            if similarity > semantic_similarity:
                 print("Most similar changed to " + current_title)
-                semanticSimilarity = similarity
-                currentURL = link
-        path.append(currentURL)
+                semantic_similarity = similarity
+                current_url = link
+        path.append(current_url)
         sleep(1)
 
     print("Failure! Traversal limit exceeded!")
