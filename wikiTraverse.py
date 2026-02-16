@@ -12,6 +12,18 @@ from time import sleep
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
+EXCLUDED_NAMESPACES = (
+    "/Special:",
+    "/Talk:",
+    "/Category:",
+    "/File:",
+    "/Wikipedia:",
+    "/Template:",
+    "/Help:",
+    "/Portal:",
+    "/Draft:",
+)
+
 DEFAULT_STEP_LIMIT = 10
 
 nlp = spacy.load("en_core_web_lg")
@@ -19,6 +31,17 @@ nlp = spacy.load("en_core_web_lg")
 
 def url_to_title(url):
     return url.rsplit("/", 1)[-1].replace("_", " ")
+
+
+def is_valid_wiki_link(href):
+    if WIKIPEDIA_ARTICLE_PREFIX not in href:
+        return False
+    if "wikidata" in href or "wikimedia" in href:
+        return False
+    for namespace in EXCLUDED_NAMESPACES:
+        if namespace in href:
+            return False
+    return True
 
 
 def extract_article_url(href):
@@ -56,18 +79,7 @@ def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
             # 3b. Sort out the 'bad' links
             # (non-Wiki references, non-main articles)
             linkHref = link.get("href", "")
-            if linkHref.find(WIKIPEDIA_ARTICLE_PREFIX) == -1:
-                continue
-            if (
-                (linkHref.find("/Special:") != -1)
-                or (linkHref.find("/Talk:") != -1)
-                or (linkHref.find("/Category:") != -1)
-                or (linkHref.find("/File:") != -1)
-                or (linkHref.find("/Wikipedia:") != -1)
-                or (linkHref.find("/Template:") != -1)
-                or (linkHref.find("wikidata") != -1)
-                or (linkHref.find("/Help:") != -1)
-            ):
+            if not is_valid_wiki_link(linkHref):
                 continue
             linkURL = extract_article_url(linkHref)
             # 3c. In order to prevent loops, I prevent the
