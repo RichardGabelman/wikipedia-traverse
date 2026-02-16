@@ -5,12 +5,6 @@ from time import sleep
 from dataclasses import dataclass
 from typing import Optional
 
-# startURL: https://en.wikipedia.org/wiki/XXXXX
-# targetURL: https://en.wikipedia.org/wiki/YYYYY
-# limit: optional int var that limits how many
-# pages the program will search
-# Returns 1 if a path is found, 0 if not
-
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
@@ -120,9 +114,13 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
     for step in range(step_limit):
         # 1. Determine if current URL is the target URL
         if current_url == target_url:
-            print("Success!")
-            print(path)
-            return 1
+            return TraversalResult(
+                success=True,
+                path=path,
+                steps_taken=step,
+                start_url=start_url,
+                target_url=target_url,
+            )
 
         # 2. Go to valid URL
         soup = fetch_page(current_url, session)
@@ -147,9 +145,14 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
         path.append(current_url)
         sleep(REQUEST_DELAY_SECONDS)
 
-    print("Failure! Traversal limit exceeded!")
-    print(path)
-    return 0
+    return TraversalResult(
+        success=False,
+        path=path,
+        steps_taken=step_limit,
+        start_url=start_url,
+        target_url=target_url,
+        error="Step limit exceeded",
+    )
 
 
 # Example of use:
