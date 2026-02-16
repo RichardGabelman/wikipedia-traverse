@@ -8,18 +8,6 @@ from typing import Optional
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
-EXCLUDED_NAMESPACES = (
-    "/Special:",
-    "/Talk:",
-    "/Category:",
-    "/File:",
-    "/Wikipedia:",
-    "/Template:",
-    "/Help:",
-    "/Portal:",
-    "/Draft:",
-)
-
 REQUEST_DELAY_SECONDS = 5
 DEFAULT_STEP_LIMIT = 10
 
@@ -49,12 +37,7 @@ def url_to_title(url):
 def is_valid_wiki_link(href):
     if not href.startswith(WIKIPEDIA_ARTICLE_PREFIX):
         return False
-    if "wikidata" in href or "wikimedia" in href:
-        return False
-    for namespace in EXCLUDED_NAMESPACES:
-        if namespace in href:
-            return False
-    return True
+    return ":" not in href.split("/wiki/", 1)[-1]
 
 
 def extract_article_url(href):
@@ -156,4 +139,4 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
 
 
 # Example of use:
-# print(traverseWiki("https://en.wikipedia.org/wiki/Big_Bang", "https://en.wikipedia.org/wiki/Taylor_Swift", 10))
+# print(traverseWiki("https://en.wikipedia.org/wiki/Big_Bang", "https://en.wikipedia.org/wiki/Taylor_Swift", 12))
