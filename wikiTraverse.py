@@ -49,6 +49,10 @@ def extract_article_url(href):
     clean_href = href.split("#")[0]
     return WIKIPEDIA_BASE_URL + clean_href
 
+def fetch_page(url):
+    response = requests.get(url)
+    return BeautifulSoup(response.content, "html.parser")
+
 
 def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
     # Parse the targetURL for the semantic meaning of the title
@@ -66,10 +70,7 @@ def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
             return 1
 
         # 2. Go to valid URL
-        response = requests.get(
-            url=currentURL,
-        )
-        soup = BeautifulSoup(response.content, "html.parser")
+        soup = fetch_page(currentURL)
 
         # 3a. Collect links
         allLinks = soup.find(id="bodyContent").find_all("a")
