@@ -24,6 +24,7 @@ EXCLUDED_NAMESPACES = (
     "/Draft:",
 )
 
+REQUEST_DELAY_SECONDS = 5
 DEFAULT_STEP_LIMIT = 10
 
 nlp = spacy.load("en_core_web_lg")
@@ -126,7 +127,7 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
                 semantic_similarity = similarity_score
                 current_url = link
         path.append(current_url)
-        sleep(5)
+        sleep(REQUEST_DELAY_SECONDS)
 
     print("Failure! Traversal limit exceeded!")
     print(path)
