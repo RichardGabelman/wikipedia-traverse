@@ -8,8 +8,10 @@ from time import sleep
 # limit: optional int var that limits how many
 # pages the program will search
 # Returns 1 if a path is found, 0 if not
+
+nlp = spacy.load("en_core_web_lg")
+
 def traverseWiki(startURL, targetURL, limit=10):
-  nlp = spacy.load("en_core_web_lg")
   # Parse the targetURL for the semantic meaning of the title
   targetTitle = targetURL.rsplit('/', 1)[-1].replace("_", " ")
   targetSemantic = nlp(targetTitle)
