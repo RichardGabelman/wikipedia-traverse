@@ -47,7 +47,7 @@ def url_to_title(url):
 
 
 def is_valid_wiki_link(href):
-    if WIKIPEDIA_ARTICLE_PREFIX not in href:
+    if not href.startswith(WIKIPEDIA_ARTICLE_PREFIX):
         return False
     if "wikidata" in href or "wikimedia" in href:
         return False
@@ -156,4 +156,4 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
 
 
 # Example of use:
-# traverseWiki("https://en.wikipedia.org/wiki/Big_Bang", "https://en.wikipedia.org/wiki/Taylor_Swift", 10)
+# print(traverseWiki("https://en.wikipedia.org/wiki/Big_Bang", "https://en.wikipedia.org/wiki/Taylor_Swift", 10))
