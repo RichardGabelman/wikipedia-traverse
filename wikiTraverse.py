@@ -75,6 +75,13 @@ def extract_article_links(soup):
     return links
 
 
+def score_candidate(candidate_url, target_doc):
+    title = url_to_title(candidate_url)
+    similarity = target_doc.similarity(nlp(title))
+
+    return similarity
+
+
 def traverseWiki(start_url, target_url, limit=DEFAULT_STEP_LIMIT):
     # Parse the targetURL for the semantic meaning of the title
     target_title = url_to_title(target_url)
@@ -103,15 +110,12 @@ def traverseWiki(start_url, target_url, limit=DEFAULT_STEP_LIMIT):
             # we've already traversed
             if link in path:
                 continue
-            # 4. Parsing links for article titles
-            current_title = url_to_title(link)
-            # 5a. Run a semantic comparison on each article title with the target article title
-            current_doc = nlp(current_title)
-            similarity = target_doc.similarity(current_doc)
+            
+            similarity_score = score_candidate(link, target_doc)
             # 5b/6. Keep track (and eventually go to) the page with the highest semantic similarity
-            if similarity > semantic_similarity:
-                print("Most similar changed to " + current_title)
-                semantic_similarity = similarity
+            if similarity_score > semantic_similarity:
+                print("Most similar changed to " + url_to_title(link))
+                semantic_similarity = similarity_score
                 current_url = link
         path.append(current_url)
         sleep(1)
