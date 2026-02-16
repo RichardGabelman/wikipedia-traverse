@@ -118,6 +118,15 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
             # we've already traversed
             if link in path:
                 continue
+            if link == target_url:
+                path.append(current_url)
+                return TraversalResult(
+                    success=True,
+                    path=path,
+                    steps_taken=step,
+                    start_url=start_url,
+                    target_url=target_url,
+                )
 
             similarity_score = score_candidate(link, target_doc)
             # 5b/6. Keep track (and eventually go to) the page with the highest semantic similarity
@@ -136,7 +145,3 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
         target_url=target_url,
         error="Step limit exceeded",
     )
-
-
-# Example of use:
-# print(traverseWiki("https://en.wikipedia.org/wiki/Big_Bang", "https://en.wikipedia.org/wiki/Taylor_Swift", 12))
