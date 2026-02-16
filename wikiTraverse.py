@@ -14,9 +14,12 @@ WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
 nlp = spacy.load("en_core_web_lg")
 
+def url_to_title(url):
+  return url.rsplit('/', 1)[-1].replace("_", " ")
+
 def traverseWiki(startURL, targetURL, limit=10):
   # Parse the targetURL for the semantic meaning of the title
-  targetTitle = targetURL.rsplit('/', 1)[-1].replace("_", " ")
+  targetTitle = url_to_title(targetURL)
   targetSemantic = nlp(targetTitle)
   currentURL = startURL
   # Path keeps track of the pages we ultimately visit
