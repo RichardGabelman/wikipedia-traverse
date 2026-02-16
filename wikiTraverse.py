@@ -12,12 +12,14 @@ from time import sleep
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
+DEFAULT_STEP_LIMIT = 10
+
 nlp = spacy.load("en_core_web_lg")
 
 def url_to_title(url):
   return url.rsplit('/', 1)[-1].replace("_", " ")
 
-def traverseWiki(startURL, targetURL, limit=10):
+def traverseWiki(startURL, targetURL, limit=DEFAULT_STEP_LIMIT):
   # Parse the targetURL for the semantic meaning of the title
   targetTitle = url_to_title(targetURL)
   targetSemantic = nlp(targetTitle)
