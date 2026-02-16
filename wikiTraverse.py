@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 import spacy
 from time import sleep
+from dataclasses import dataclass
+from typing import Optional
 
 # startURL: https://en.wikipedia.org/wiki/XXXXX
 # targetURL: https://en.wikipedia.org/wiki/YYYYY
@@ -26,6 +28,22 @@ EXCLUDED_NAMESPACES = (
 
 REQUEST_DELAY_SECONDS = 5
 DEFAULT_STEP_LIMIT = 10
+
+
+@dataclass
+class TraversalResult:
+    success: bool
+    path: list[str]
+    steps_taken: int
+    start_url: str
+    target_url: str
+    error: Optional[str] = None
+
+    def __str__(self):
+        status = "SUCCESS" if self.success else "FAILURE"
+        path_str = " -> ".join(url_to_title(url) for url in self.path)
+        return f"[{status}] {self.steps_taken} steps\nPath: {path_str}"
+
 
 nlp = spacy.load("en_core_web_lg")
 
@@ -119,7 +137,7 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
             # we've already traversed
             if link in path:
                 continue
-            
+
             similarity_score = score_candidate(link, target_doc)
             # 5b/6. Keep track (and eventually go to) the page with the highest semantic similarity
             if similarity_score > semantic_similarity:
