@@ -9,6 +9,9 @@ from time import sleep
 # pages the program will search
 # Returns 1 if a path is found, 0 if not
 
+WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
+WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
+
 nlp = spacy.load("en_core_web_lg")
 
 def traverseWiki(startURL, targetURL, limit=10):
@@ -40,7 +43,7 @@ def traverseWiki(startURL, targetURL, limit=10):
       # 3b. Sort out the 'bad' links
       # (non-Wiki references, non-main articles)
       linkHref = link.get('href', "")
-      if linkHref.find("/wiki/") == -1:
+      if linkHref.find(WIKIPEDIA_ARTICLE_PREFIX) == -1:
         continue
       if ((linkHref.find("/Special:") != -1) or 
           (linkHref.find("/Talk:") != -1) or 
@@ -51,7 +54,7 @@ def traverseWiki(startURL, targetURL, limit=10):
           (linkHref.find("wikidata") != -1) or
           (linkHref.find("/Help:") != -1)):
         continue
-      linkURL = "https://en.wikipedia.org" + linkHref
+      linkURL = WIKIPEDIA_BASE_URL + linkHref
       # 3c. In order to prevent loops, I prevent the
       # program from looking at links to pages
       # we've already traversed
