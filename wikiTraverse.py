@@ -118,15 +118,6 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
             # we've already traversed
             if link in path:
                 continue
-            if link == target_url:
-                path.append(current_url)
-                return TraversalResult(
-                    success=True,
-                    path=path,
-                    steps_taken=step,
-                    start_url=start_url,
-                    target_url=target_url,
-                )
 
             similarity_score = score_candidate(link, target_doc)
             # 5b/6. Keep track (and eventually go to) the page with the highest semantic similarity
@@ -135,6 +126,14 @@ def traverseWiki(start_url, target_url, step_limit=DEFAULT_STEP_LIMIT):
                 semantic_similarity = similarity_score
                 current_url = link
         path.append(current_url)
+        if current_url == target_url:
+            return TraversalResult(
+                success=True,
+                path=path,
+                steps_taken=step,
+                start_url=start_url,
+                target_url=target_url,
+            )
         sleep(REQUEST_DELAY_SECONDS)
 
     return TraversalResult(
