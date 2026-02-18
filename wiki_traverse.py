@@ -15,6 +15,8 @@ DEFAULT_STEP_LIMIT = 10
 
 @dataclass
 class TraversalResult:
+    """Structured result returned by traverse_wiki()."""
+
     success: bool
     path: list[str]
     steps_taken: int
@@ -32,22 +34,36 @@ nlp = spacy.load("en_core_web_lg")
 
 
 def url_to_title(url: str) -> str:
+    """Extract an article title from a Wikipedia URL."""
     return url.rsplit("/", 1)[-1].replace("_", " ")
 
 
 def is_valid_wiki_link(href: str) -> bool:
+    """
+    Return True for only links that point to main Wikipedia articles.
+    Filters out anchors, external links, and non-article internal links.
+    """
     if not href.startswith(WIKIPEDIA_ARTICLE_PREFIX):
         return False
+    # Reject links containing a colon.
+    # Colons indicate a non-main article namespace prefix.
+    # (Talk:, Category:, etc.)
+    # Plain article links never contain a colon.
     return ":" not in href.split("/wiki/", 1)[-1]
 
 
 def extract_article_url(href: str) -> str:
+    """Builds a complete Wikipedia URL from a relative href."""
     # Strip any in-page anchor (#Section)
     clean_href = href.split("#")[0]
     return WIKIPEDIA_BASE_URL + clean_href
 
 
 def fetch_page(url: str, session: requests.Session) -> Optional[BeautifulSoup]:
+    """
+    Fetch a Wikipedia page and return a BeautifulSoup object.
+    Returns None on error.
+    """
     try:
         response = session.get(url, timeout=10)
         response.raise_for_status()
@@ -58,13 +74,18 @@ def fetch_page(url: str, session: requests.Session) -> Optional[BeautifulSoup]:
 
 
 def extract_article_links(soup: BeautifulSoup) -> list[str]:
+    """
+    Returns all unique, valid Wikipedia article URLs found in the
+    main body content of a parsed page.
+    """
     body = soup.find(id="bodyContent")
     if body is None:
         return []
 
     seen: set[str] = set()
     links: list[str] = []
-    # Iterate through all links with an href (link to another article)
+    # Iterate through all links (a) with an href.
+    # Links containing an href link to another article.
     for tag in body.find_all("a", href=True):
         href = tag.get("href", "")
         if not isinstance(href, str):
@@ -80,25 +101,51 @@ def extract_article_links(soup: BeautifulSoup) -> list[str]:
 
 
 def score_candidate(candidate_url: str, target_doc) -> int:
+    """
+    Score a candidate URL by semantic similarity of its title to the
+    target title. Returns the semantic similarity value.
+    """
     title = url_to_title(candidate_url)
     similarity = target_doc.similarity(nlp(title))
 
     return similarity
 
 
-def traverse_wiki(start_url: str, target_url: str, step_limit: int = DEFAULT_STEP_LIMIT) -> TraversalResult:
-    # Parse the targetURL for the semantic meaning of the title
+def traverse_wiki(
+    start_url: str,
+    target_url: str,
+    step_limit: int = DEFAULT_STEP_LIMIT,
+) -> TraversalResult:
+    """
+    Attempt to navigate from `start_url` to `target_url` using Wikipedia links.
+
+    Strategy - greedy search by NLP semantic similarity:
+        At each page, we gather all unique links to other Wikipedia articles.
+        We extract the title from each link, and perform semantic similarity
+        analysis between it and the target title. The article whose title is
+        the most semantically similar is moved to and the process repeats.
+
+    Args:
+        start_url: Full Wikipedia article URL to start from.
+        target_url: Full Wikipedia article URL to reach.
+        step_limit: Maximum number of page hops before giving up.
+
+    Returns:
+        A TraversalResult with success flag, path, and error info.
+    """
     target_title = url_to_title(target_url)
     target_doc = nlp(target_title)
+
     current_url = start_url
-    # Path keeps track of the pages we ultimately visit
+
+    # Path keeps track of the pages we ultimately visit.
     path: list[str] = [current_url]
 
     session = requests.Session()
     session.headers.update({"User-Agent": "WikiTraversal/2.0 (education project)"})
 
     for step in range(step_limit):
-        # 1. Determine if current URL is the target URL
+        # Check for success before fetching.
         if current_url == target_url:
             return TraversalResult(
                 success=True,
@@ -108,29 +155,30 @@ def traverse_wiki(start_url: str, target_url: str, step_limit: int = DEFAULT_STE
                 target_url=target_url,
             )
 
-        # 2. Go to valid URL
         soup = fetch_page(current_url, session)
         if soup is None:
             continue
 
-        # 3a. Collect links
         links: list[str] = extract_article_links(soup)
+
         semantic_similarity = 0
 
         for link in links:
-            # 3b. In order to prevent loops, I prevent the
-            # program from looking at links to pages
-            # we've already traversed
+            # Prevent consideration of articles already visited.
             if link in path:
                 continue
 
             similarity_score: int = score_candidate(link, target_doc)
-            # 5b/6. Keep track (and eventually go to) the page with the highest semantic similarity
+
+            # Keep track of the page with the highest semantic similarity.
             if similarity_score > semantic_similarity:
                 print("Most similar changed to " + url_to_title(link))
                 semantic_similarity = similarity_score
                 current_url = link
+
         path.append(current_url)
+
+        # Check if we just selected the target.
         if current_url == target_url:
             return TraversalResult(
                 success=True,
@@ -139,8 +187,11 @@ def traverse_wiki(start_url: str, target_url: str, step_limit: int = DEFAULT_STE
                 start_url=start_url,
                 target_url=target_url,
             )
+        
+        # Respect Wikipedia's rate limits.
         sleep(REQUEST_DELAY_SECONDS)
 
+    # Step limit exceeded.
     return TraversalResult(
         success=False,
         path=path,
