@@ -136,13 +136,13 @@ def traverse_wiki(
     # Handle start_url == target_url edge case.
     if start_url == target_url:
         return TraversalResult(
-                success=True,
-                path=[],
-                steps_taken=0,
-                start_url=start_url,
-                target_url=target_url,
-            )
-    
+            success=True,
+            path=[],
+            steps_taken=0,
+            start_url=start_url,
+            target_url=target_url,
+        )
+
     target_title = url_to_title(target_url)
     target_doc = nlp(target_title)
 
@@ -187,7 +187,7 @@ def traverse_wiki(
                 start_url=start_url,
                 target_url=target_url,
             )
-        
+
         # Respect Wikipedia's rate limits.
         sleep(REQUEST_DELAY_SECONDS)
 
