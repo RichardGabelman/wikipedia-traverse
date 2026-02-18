@@ -200,3 +200,13 @@ def traverse_wiki(
         target_url=target_url,
         error="Step limit exceeded",
     )
+
+if __name__ == "__main__":
+    start_url = "https://en.wikipedia.org/wiki/Philosophy"
+    target_url = "https://en.wikipedia.org/wiki/Pizza"
+    result = traverse_wiki(
+        start_url,
+        target_url,
+        15
+    )
+    print(result)
