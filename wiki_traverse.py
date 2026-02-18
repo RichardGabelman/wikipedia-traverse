@@ -1,8 +1,8 @@
-import requests
 from time import sleep
 from dataclasses import dataclass
 from typing import Optional
 
+import requests
 import spacy
 from bs4 import BeautifulSoup
 
