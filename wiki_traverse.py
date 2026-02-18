@@ -1,3 +1,4 @@
+import logging
 from time import sleep
 from dataclasses import dataclass
 from typing import Optional
@@ -11,6 +12,13 @@ WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
 REQUEST_DELAY_SECONDS = 5
 DEFAULT_STEP_LIMIT = 10
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -69,7 +77,7 @@ def fetch_page(url: str, session: requests.Session) -> Optional[BeautifulSoup]:
         response.raise_for_status()
         return BeautifulSoup(response.content, "html.parser")
     except requests.RequestException as exc:
-        print(exc)
+        logger.warning("Failed to fetch %s: %s", url, exc)
         return None
 
 
@@ -115,6 +123,7 @@ def traverse_wiki(
     start_url: str,
     target_url: str,
     step_limit: int = DEFAULT_STEP_LIMIT,
+    verbose: bool = False,
 ) -> TraversalResult:
     """
     Attempt to navigate from `start_url` to `target_url` using Wikipedia links.
@@ -129,10 +138,14 @@ def traverse_wiki(
         start_url: Full Wikipedia article URL to start from.
         target_url: Full Wikipedia article URL to reach.
         step_limit: Maximum number of page hops before giving up.
+        verbose: Whether the logger will show debug statements.
 
     Returns:
         A TraversalResult with success flag, path, and error info.
     """
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     # Handle start_url == target_url edge case.
     if start_url == target_url:
         return TraversalResult(
@@ -145,6 +158,9 @@ def traverse_wiki(
 
     target_title = url_to_title(target_url)
     target_doc = nlp(target_title)
+    logger.info("Target: '%s'", target_title)
+    logger.info("Start:  '%s'", url_to_title(start_url))
+    logger.info("Step limit: %d", step_limit)
 
     current_url = start_url
 
@@ -172,18 +188,20 @@ def traverse_wiki(
 
             # Keep track of the page with the highest semantic similarity.
             if similarity_score > semantic_similarity:
-                print("Most similar changed to " + url_to_title(link))
+                logger.debug("Most similar changed to %s (%.4f)", url_to_title(link), similarity_score)
                 semantic_similarity = similarity_score
                 current_url = link
 
         path.append(current_url)
+        logger.info("Best this step: '%s' (%.4f)", url_to_title(current_url), semantic_similarity)
 
         # Check if we just selected the target.
         if current_url == target_url:
+            logger.info("Target reached at step %d!", step + 1)
             return TraversalResult(
                 success=True,
                 path=path,
-                steps_taken=step,
+                steps_taken=step + 1,
                 start_url=start_url,
                 target_url=target_url,
             )
@@ -192,6 +210,7 @@ def traverse_wiki(
         sleep(REQUEST_DELAY_SECONDS)
 
     # Step limit exceeded.
+    logger.warning("Traversal ended without reaching target.")
     return TraversalResult(
         success=False,
         path=path,
@@ -201,12 +220,9 @@ def traverse_wiki(
         error="Step limit exceeded",
     )
 
+
 if __name__ == "__main__":
     start_url = "https://en.wikipedia.org/wiki/Philosophy"
     target_url = "https://en.wikipedia.org/wiki/Pizza"
-    result = traverse_wiki(
-        start_url,
-        target_url,
-        15
-    )
+    result = traverse_wiki(start_url, target_url, 15, True)
     print(result)
