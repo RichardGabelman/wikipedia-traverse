@@ -12,6 +12,7 @@ WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
 REQUEST_DELAY_SECONDS = 5
 DEFAULT_STEP_LIMIT = 10
+DEFAULT_BEAM_WIDTH = 5
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,7 +27,6 @@ class TraversalResult:
     """Structured result returned by traverse_wiki()."""
 
     success: bool
-    path: list[str]
     steps_taken: int
     elapsed_seconds: float
     start_url: str
@@ -35,10 +35,10 @@ class TraversalResult:
 
     def __str__(self) -> str:
         status = "SUCCESS" if self.success else "FAILURE"
-        path_str = " -> ".join(url_to_title(url) for url in self.path)
+        # path_str = " -> ".join(url_to_title(url) for url in self.path)
         return (
             f"[{status}] {self.steps_taken} steps in {self.elapsed_seconds:.1f}s\n"
-            f"Path: {path_str}"
+            # f"Path: {path_str}"
         )
 
 
@@ -112,40 +112,51 @@ def extract_article_links(soup: BeautifulSoup) -> list[str]:
     return links
 
 
-def score_candidate(candidate_url: str, target_doc) -> int:
+def score_candidates(
+    candidate_urls: list[str], target_doc, beam_width: int
+) -> list[tuple[float, str]]:
     """
-    Score a candidate URL by semantic similarity of its title to the
-    target title. Returns the semantic similarity value.
+    Score each candidate URL by semantic similarity of its title to the
+    target title. Returns the top `beam_width` candidates as
+    (score, url) tuples, sorted descending by score.
     """
-    title = url_to_title(candidate_url)
-    similarity = target_doc.similarity(nlp(title))
+    scored: list[tuple[float, str]] = []
+    for url in candidate_urls:
+        title = url_to_title(url)
+        similarity = target_doc.similarity(nlp(title))
+        scored.append((similarity, url))
 
-    return similarity
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return scored[:beam_width]
 
 
 def traverse_wiki(
     start_url: str,
     target_url: str,
     step_limit: int = DEFAULT_STEP_LIMIT,
+    beam_width: int = DEFAULT_BEAM_WIDTH,
     verbose: bool = False,
 ) -> TraversalResult:
     """
     Attempt to navigate from `start_url` to `target_url` using Wikipedia links.
 
-    Strategy - greedy search by NLP semantic similarity:
-        At each page, we gather all unique links to other Wikipedia articles.
-        We extract the title from each link, and perform semantic similarity
-        analysis between it and the target title. The article whose title is
-        the most semantically similar is moved to and the process repeats.
+    Strategy - beam search guided by NLP semantic similarity:
+        At each step, we maintain a frontier of up to `beam_width` candidate
+        pages. We extract the Wikipedia article links from each page, 
+        the article title from each url, and perform semantic analysis 
+        between it and the target title. The `beam_width` articles whose 
+        titles are the most semantically similar are moved to the frontier
+        and the process repeats.
 
     Args:
         start_url: Full Wikipedia article URL to start from.
         target_url: Full Wikipedia article URL to reach.
         step_limit: Maximum number of page hops before giving up.
+        beam_width: The number of candidate pages we expand at each step.
         verbose: Whether the logger will show debug statements.
 
     Returns:
-        A TraversalResult with success flag, path, and error info.
+        A TraversalResult with success flag, start/target urls, and error info.
     """
     start_time = time.monotonic()
 
@@ -157,7 +168,6 @@ def traverse_wiki(
         elapsed = time.monotonic() - start_time
         return TraversalResult(
             success=True,
-            path=[],
             steps_taken=0,
             elapsed_seconds=elapsed,
             start_url=start_url,
@@ -170,69 +180,68 @@ def traverse_wiki(
     logger.info("Start:  '%s'", url_to_title(start_url))
     logger.info("Step limit: %d", step_limit)
 
-    current_url = start_url
+    # visited tracks every URL we have ever processed, NLP-wise
+    # so we never process the same page twice
+    visited: set[str] = {start_url}
 
-    # Path keeps track of the pages we ultimately visit.
-    path: list[str] = [current_url]
+    # frontier is the set of pages we will process next.
+    frontier: list[str] = [start_url]
 
     session = requests.Session()
     session.headers.update({"User-Agent": "WikiTraversal/2.0 (education project)"})
 
     for step in range(step_limit):
-        soup = fetch_page(current_url, session)
-        if soup is None:
-            continue
+        if not frontier:
+            logging.warning("Frontier is empty, no pages to explore.")
+            break
 
-        links: list[str] = extract_article_links(soup)
-
-        semantic_similarity = 0
-
-        for link in links:
-            # Prevent consideration of articles already visited.
-            if link in path:
+        candidate_urls: list[str] = []
+        for current_url in frontier:
+            soup = fetch_page(current_url, session)
+            if soup is None:
                 continue
 
-            similarity_score: int = score_candidate(link, target_doc)
+            page_links = extract_article_links(soup)
+            non_visited_links = [link for link in page_links if link not in visited]
+            candidate_urls.extend(non_visited_links)
 
-            # Keep track of the page with the highest semantic similarity.
-            if similarity_score > semantic_similarity:
-                logger.debug(
-                    "Most similar changed to %s (%.4f)",
-                    url_to_title(link),
-                    similarity_score,
-                )
-                semantic_similarity = similarity_score
-                current_url = link
+            # Respect Wikipedia's rate limits.
+            time.sleep(REQUEST_DELAY_SECONDS)
 
-        path.append(current_url)
-        logger.info(
-            "Best this step: '%s' (%.4f)",
-            url_to_title(current_url),
-            semantic_similarity,
+        top_frontier_scorers = score_candidates(
+            candidate_urls, target_doc, beam_width
         )
 
-        # Check if we just selected the target.
-        if current_url == target_url:
+        if not top_frontier_scorers:
+            logger.warning("No scorable candidates found.")
+            break
+
+        for rank, (score, url) in enumerate(top_frontier_scorers, 1):
+            logger.info("Candidate #%d (%.4f) %s", rank, score, url_to_title(url))
+
+        best_score, best_url = top_frontier_scorers[0]
+        logger.info("Best this step: `%s` (%.4f)", url_to_title(best_url), best_score)
+
+        # Check if we found the target.
+        if best_url == target_url:
             elapsed = time.monotonic() - start_time
-            logger.info("Target reached at step %d!", step + 1)
+            logger.info("Target reached at step %d!", step)
             return TraversalResult(
                 success=True,
-                path=path,
-                steps_taken=step + 1,
+                steps_taken=step,
                 elapsed_seconds=elapsed,
                 start_url=start_url,
                 target_url=target_url,
             )
-
-        # Respect Wikipedia's rate limits.
-        time.sleep(REQUEST_DELAY_SECONDS)
+        
+        frontier = [url for score, url in top_frontier_scorers]
+        visited.update(frontier)
 
     # Step limit exceeded.
     elapsed = time.monotonic() - start_time
     logger.warning("Traversal ended without reaching target.")
     return TraversalResult(
         success=False,
-        path=path,
         steps_taken=step_limit,
         elapsed_seconds=elapsed,
         start_url=start_url,
