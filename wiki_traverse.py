@@ -1,5 +1,5 @@
 import logging
-from time import sleep
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -28,6 +28,7 @@ class TraversalResult:
     success: bool
     path: list[str]
     steps_taken: int
+    elapsed_seconds: float
     start_url: str
     target_url: str
     error: Optional[str] = None
@@ -35,7 +36,10 @@ class TraversalResult:
     def __str__(self) -> str:
         status = "SUCCESS" if self.success else "FAILURE"
         path_str = " -> ".join(url_to_title(url) for url in self.path)
-        return f"[{status}] {self.steps_taken} steps\nPath: {path_str}"
+        return (
+            f"[{status}] {self.steps_taken} steps in {self.elapsed_seconds:.1f}s\n"
+            f"Path: {path_str}"
+        )
 
 
 nlp = spacy.load("en_core_web_lg")
@@ -143,15 +147,19 @@ def traverse_wiki(
     Returns:
         A TraversalResult with success flag, path, and error info.
     """
+    start_time = time.monotonic()
+
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     # Handle start_url == target_url edge case.
     if start_url == target_url:
+        elapsed = time.monotonic() - start_time
         return TraversalResult(
             success=True,
             path=[],
             steps_taken=0,
+            elapsed_seconds=elapsed,
             start_url=start_url,
             target_url=target_url,
         )
@@ -188,33 +196,45 @@ def traverse_wiki(
 
             # Keep track of the page with the highest semantic similarity.
             if similarity_score > semantic_similarity:
-                logger.debug("Most similar changed to %s (%.4f)", url_to_title(link), similarity_score)
+                logger.debug(
+                    "Most similar changed to %s (%.4f)",
+                    url_to_title(link),
+                    similarity_score,
+                )
                 semantic_similarity = similarity_score
                 current_url = link
 
         path.append(current_url)
-        logger.info("Best this step: '%s' (%.4f)", url_to_title(current_url), semantic_similarity)
+        logger.info(
+            "Best this step: '%s' (%.4f)",
+            url_to_title(current_url),
+            semantic_similarity,
+        )
 
         # Check if we just selected the target.
         if current_url == target_url:
+            elapsed = time.monotonic() - start_time
             logger.info("Target reached at step %d!", step + 1)
             return TraversalResult(
                 success=True,
                 path=path,
                 steps_taken=step + 1,
+                elapsed_seconds=elapsed,
                 start_url=start_url,
                 target_url=target_url,
             )
 
         # Respect Wikipedia's rate limits.
-        sleep(REQUEST_DELAY_SECONDS)
+        time.sleep(REQUEST_DELAY_SECONDS)
 
     # Step limit exceeded.
+    elapsed = time.monotonic() - start_time
     logger.warning("Traversal ended without reaching target.")
     return TraversalResult(
         success=False,
         path=path,
         steps_taken=step_limit,
+        elapsed_seconds=elapsed,
         start_url=start_url,
         target_url=target_url,
         error="Step limit exceeded",
