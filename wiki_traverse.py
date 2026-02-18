@@ -133,6 +133,16 @@ def traverse_wiki(
     Returns:
         A TraversalResult with success flag, path, and error info.
     """
+    # Handle start_url == target_url edge case.
+    if start_url == target_url:
+        return TraversalResult(
+                success=True,
+                path=[],
+                steps_taken=0,
+                start_url=start_url,
+                target_url=target_url,
+            )
+    
     target_title = url_to_title(target_url)
     target_doc = nlp(target_title)
 
@@ -145,16 +155,6 @@ def traverse_wiki(
     session.headers.update({"User-Agent": "WikiTraversal/2.0 (education project)"})
 
     for step in range(step_limit):
-        # Check for success before fetching.
-        if current_url == target_url:
-            return TraversalResult(
-                success=True,
-                path=path,
-                steps_taken=step,
-                start_url=start_url,
-                target_url=target_url,
-            )
-
         soup = fetch_page(current_url, session)
         if soup is None:
             continue
