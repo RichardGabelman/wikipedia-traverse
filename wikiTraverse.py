@@ -1,9 +1,10 @@
 import requests
-from bs4 import BeautifulSoup
-import spacy
 from time import sleep
 from dataclasses import dataclass
 from typing import Optional
+
+import spacy
+from bs4 import BeautifulSoup
 
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
