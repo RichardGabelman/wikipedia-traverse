@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
-REQUEST_DELAY_SECONDS = 2
+REQUEST_DELAY_SECONDS = 1
 DEFAULT_STEP_LIMIT = 10
 DEFAULT_BEAM_WIDTH = 5
 
@@ -220,7 +220,7 @@ def traverse_wiki(
     parents: dict[str, str] = {}
 
     session = requests.Session()
-    session.headers.update({"User-Agent": "WikiTraversal/2.0 (education project)"})
+    session.headers.update({"User-Agent": "WikiNLPTraversalbot/2.0 richardgabelman@gmail.com"})
 
     for step in range(step_limit):
         if not frontier:
