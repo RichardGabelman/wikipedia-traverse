@@ -124,7 +124,11 @@ def score_candidates(
     scored: list[tuple[float, str]] = []
     for url in candidate_urls:
         title = url_to_title(url)
-        similarity = target_doc.similarity(nlp(title))
+        doc = nlp(title)
+        if doc.has_vector and target_doc.has_vector:
+            similarity = target_doc.similarity(doc)
+        else:
+            similarity = 0.0
         scored.append((similarity, url))
 
     scored.sort(key=lambda x: x[0], reverse=True)
