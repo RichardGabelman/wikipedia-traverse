@@ -1,3 +1,4 @@
+import argparse
 import logging
 import time
 from dataclasses import dataclass
@@ -279,8 +280,44 @@ def traverse_wiki(
     )
 
 
-if __name__ == "__main__":
-    start_url = "https://en.wikipedia.org/wiki/Philosophy"
-    target_url = "https://en.wikipedia.org/wiki/Pizza"
-    result = traverse_wiki(start_url, target_url, 15, True)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Find a path between two Wikipedia articles using semantic similarity."
+    )
+    parser.add_argument("start", help="Starting Wikipedia article URL or title")
+    parser.add_argument("target", help="Target Wikipedia article URL or title")
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=DEFAULT_STEP_LIMIT,
+        help=f"Maximum number of steps (default: {DEFAULT_STEP_LIMIT})",
+    )
+    parser.add_argument(
+        "--beam-width",
+        type=int,
+        default=DEFAULT_BEAM_WIDTH,
+        help=f"Number of candidates to track (default: {DEFAULT_BEAM_WIDTH})",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+
+    args = parser.parse_args()
+
+    start_url = (
+        args.start
+        if args.start.startswith("http")
+        else WIKIPEDIA_BASE_URL + WIKIPEDIA_ARTICLE_PREFIX + args.start
+    )
+    target_url = (
+        args.target
+        if args.target.startswith("http")
+        else WIKIPEDIA_BASE_URL + WIKIPEDIA_ARTICLE_PREFIX + args.target
+    )
+
+    result = traverse_wiki(
+        start_url, target_url, step_limit=args.steps, beam_width=args.beam_width
+    )
     print(result)
+
+
+if __name__ == "__main__":
+    main()
