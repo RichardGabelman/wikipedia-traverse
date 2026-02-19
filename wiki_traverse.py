@@ -29,16 +29,17 @@ class TraversalResult:
     success: bool
     steps_taken: int
     elapsed_seconds: float
+    path: list[str]
     start_url: str
     target_url: str
     error: Optional[str] = None
 
     def __str__(self) -> str:
         status = "SUCCESS" if self.success else "FAILURE"
-        # path_str = " -> ".join(url_to_title(url) for url in self.path)
+        path_str = " -> ".join(url_to_title(url) for url in self.path)
         return (
             f"[{status}] {self.steps_taken} steps in {self.elapsed_seconds:.1f}s\n"
-            # f"Path: {path_str}"
+            f"Path: {path_str}"
         )
 
 
@@ -130,6 +131,20 @@ def score_candidates(
     return scored[:beam_width]
 
 
+def reconstruct_path(
+    parents: dict[str, str], start_url: str, target_url: str
+) -> list[str]:
+    """Return the path taken via a backwards trace through parents."""
+    path = []
+    current = target_url
+    while current != start_url:
+        path.append(current)
+        current = parents[current]
+    path.append(start_url)
+    path.reverse()
+    return path
+
+
 def traverse_wiki(
     start_url: str,
     target_url: str,
@@ -142,9 +157,9 @@ def traverse_wiki(
 
     Strategy - beam search guided by NLP semantic similarity:
         At each step, we maintain a frontier of up to `beam_width` candidate
-        pages. We extract the Wikipedia article links from each page, 
-        the article title from each url, and perform semantic analysis 
-        between it and the target title. The `beam_width` articles whose 
+        pages. We extract the Wikipedia article links from each page,
+        the article title from each url, and perform semantic analysis
+        between it and the target title. The `beam_width` articles whose
         titles are the most semantically similar are moved to the frontier
         and the process repeats.
 
@@ -170,6 +185,7 @@ def traverse_wiki(
             success=True,
             steps_taken=0,
             elapsed_seconds=elapsed,
+            path=[start_url],
             start_url=start_url,
             target_url=target_url,
         )
@@ -187,6 +203,10 @@ def traverse_wiki(
     # frontier is the set of pages we will process next.
     frontier: list[str] = [start_url]
 
+    # parents track which visited article preceded another
+    # child : parent
+    parents: dict[str, str] = {}
+
     session = requests.Session()
     session.headers.update({"User-Agent": "WikiTraversal/2.0 (education project)"})
 
@@ -203,14 +223,16 @@ def traverse_wiki(
 
             page_links = extract_article_links(soup)
             non_visited_links = [link for link in page_links if link not in visited]
+
+            for link in non_visited_links:
+                parents[link] = current_url
+
             candidate_urls.extend(non_visited_links)
 
             # Respect Wikipedia's rate limits.
             time.sleep(REQUEST_DELAY_SECONDS)
 
-        top_frontier_scorers = score_candidates(
-            candidate_urls, target_doc, beam_width
-        )
+        top_frontier_scorers = score_candidates(candidate_urls, target_doc, beam_width)
 
         if not top_frontier_scorers:
             logger.warning("No scorable candidates found.")
@@ -225,15 +247,17 @@ def traverse_wiki(
         # Check if we found the target.
         if best_url == target_url:
             elapsed = time.monotonic() - start_time
-            logger.info("Target reached at step %d!", step)
+            path = reconstruct_path(parents, start_url, target_url)
+            logger.info("Target reached at step %d!", step + 1)
             return TraversalResult(
                 success=True,
-                steps_taken=step,
+                steps_taken=step + 1,
                 elapsed_seconds=elapsed,
+                path=path,
                 start_url=start_url,
                 target_url=target_url,
             )
-        
+
         frontier = [url for score, url in top_frontier_scorers]
         visited.update(frontier)
 
@@ -244,6 +268,7 @@ def traverse_wiki(
         success=False,
         steps_taken=step_limit,
         elapsed_seconds=elapsed,
+        path=[],
         start_url=start_url,
         target_url=target_url,
         error="Step limit exceeded",
