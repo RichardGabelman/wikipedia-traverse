@@ -115,16 +115,21 @@ def extract_article_links(soup: BeautifulSoup) -> list[str]:
 
 
 def score_candidates(
-    candidate_urls: list[str], target_doc, beam_width: int
+    candidate_urls: set[str], target_doc, target_title: str, beam_width: int
 ) -> list[tuple[float, str]]:
     """
     Score each candidate URL by semantic similarity of its title to the
     target title. Returns the top `beam_width` candidates as
     (score, url) tuples, sorted descending by score.
+
+    If the target is found, it's returned immediately as the only candidate.
     """
     scored: list[tuple[float, str]] = []
     for url in candidate_urls:
         title = url_to_title(url)
+        if title == target_title:
+            # Target found
+            return [(1.0, url)]
         doc = nlp(title)
         if doc.has_vector and target_doc.has_vector:
             similarity = target_doc.similarity(doc)
@@ -201,14 +206,16 @@ def traverse_wiki(
     logger.info("Start:  '%s'", url_to_title(start_url))
     logger.info("Step limit: %d", step_limit)
 
-    # visited tracks every URL we have ever processed, NLP-wise
-    # so we never process the same page twice
+    # visited tracks every page we've extracted URLs from
+    # so we don't visit a page more than once.
     visited: set[str] = {start_url}
 
-    # frontier is the set of pages we will process next.
+    # frontier is the set of pages we will visit next.
     frontier: list[str] = [start_url]
 
-    # parents track which visited article preceded another
+    # parents track where an article was encountered.
+    # If we find a link to Y on article X,
+    # X is said to be the parent of Y.
     # child : parent
     parents: dict[str, str] = {}
 
@@ -220,24 +227,25 @@ def traverse_wiki(
             logging.warning("Frontier is empty, no pages to explore.")
             break
 
-        candidate_urls: list[str] = []
+        candidate_urls_set: set[str] = set()
         for current_url in frontier:
             soup = fetch_page(current_url, session)
             if soup is None:
                 continue
 
             page_links = extract_article_links(soup)
-            non_visited_links = [link for link in page_links if link not in visited]
 
-            for link in non_visited_links:
-                parents[link] = current_url
-
-            candidate_urls.extend(non_visited_links)
+            for link in page_links:
+                if link not in visited:
+                    parents[link] = current_url
+                    candidate_urls_set.add(link)
 
             # Respect Wikipedia's rate limits.
             time.sleep(REQUEST_DELAY_SECONDS)
 
-        top_frontier_scorers = score_candidates(candidate_urls, target_doc, beam_width)
+        top_frontier_scorers = score_candidates(
+            candidate_urls_set, target_doc, target_title, beam_width
+        )
 
         if not top_frontier_scorers:
             logger.warning("No scorable candidates found.")
