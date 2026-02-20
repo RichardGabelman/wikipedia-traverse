@@ -127,7 +127,7 @@ def score_candidates(
     scored: list[tuple[float, str]] = []
     for url in candidate_urls:
         title = url_to_title(url)
-        if title == target_title:
+        if title.lower() == target_title:
             # Target found
             return [(1.0, url)]
         doc = nlp(title)
@@ -200,10 +200,10 @@ def traverse_wiki(
             target_url=target_url,
         )
 
-    target_title = url_to_title(target_url)
+    target_title = url_to_title(target_url).lower()
     target_doc = nlp(target_title)
     logger.info("Target: '%s'", target_title)
-    logger.info("Start:  '%s'", url_to_title(start_url))
+    logger.info("Start:  '%s'", url_to_title(start_url).lower())
     logger.info("Step limit: %d", step_limit)
 
     # visited tracks every page we've extracted URLs from
@@ -258,9 +258,10 @@ def traverse_wiki(
         logger.info("Best this step: `%s` (%.4f)", url_to_title(best_url), best_score)
 
         # Check if we found the target.
-        if best_url == target_url:
+        # Normalize the best url casing.
+        if url_to_title(best_url).lower() == target_title:
             elapsed = time.monotonic() - start_time
-            path = reconstruct_path(parents, start_url, target_url)
+            path = reconstruct_path(parents, start_url, best_url)
             logger.info("Target reached at step %d!", step + 1)
             return TraversalResult(
                 success=True,
@@ -313,12 +314,12 @@ def main():
     start_url = (
         args.start
         if args.start.startswith("http")
-        else WIKIPEDIA_BASE_URL + WIKIPEDIA_ARTICLE_PREFIX + args.start
+        else WIKIPEDIA_BASE_URL + WIKIPEDIA_ARTICLE_PREFIX + args.start.replace(" ", "_")
     )
     target_url = (
         args.target
         if args.target.startswith("http")
-        else WIKIPEDIA_BASE_URL + WIKIPEDIA_ARTICLE_PREFIX + args.target
+        else WIKIPEDIA_BASE_URL + WIKIPEDIA_ARTICLE_PREFIX + args.target.replace(" ", "_")
     )
 
     result = traverse_wiki(
