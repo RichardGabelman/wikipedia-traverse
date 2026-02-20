@@ -160,7 +160,6 @@ def traverse_wiki(
     target_url: str,
     step_limit: int = DEFAULT_STEP_LIMIT,
     beam_width: int = DEFAULT_BEAM_WIDTH,
-    verbose: bool = False,
 ) -> TraversalResult:
     """
     Attempt to navigate from `start_url` to `target_url` using Wikipedia links.
@@ -178,15 +177,11 @@ def traverse_wiki(
         target_url: Full Wikipedia article URL to reach.
         step_limit: Maximum number of page hops before giving up.
         beam_width: The number of candidate pages we expand at each step.
-        verbose: Whether the logger will show debug statements.
 
     Returns:
         A TraversalResult with success flag, start/target urls, and error info.
     """
     start_time = time.monotonic()
-
-    if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
 
     # Handle start_url == target_url edge case.
     if start_url == target_url:
@@ -307,7 +302,6 @@ def main():
         default=DEFAULT_BEAM_WIDTH,
         help=f"Number of candidates to track (default: {DEFAULT_BEAM_WIDTH})",
     )
-    parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
 
