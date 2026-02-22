@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 WIKIPEDIA_BASE_URL = "https://en.wikipedia.org"
 WIKIPEDIA_ARTICLE_PREFIX = "/wiki/"
 
-REQUEST_DELAY_SECONDS = 1
+REQUEST_DELAY_SECONDS = 0.25
 DEFAULT_STEP_LIMIT = 10
 DEFAULT_BEAM_WIDTH = 5
 
@@ -37,7 +37,7 @@ class TraversalResult:
 
     def __str__(self) -> str:
         status = "SUCCESS" if self.success else "FAILURE"
-        path_str = " -> ".join(url_to_title(url) for url in self.path)
+        path_str = "Path: -> ".join(url_to_title(url) for url in self.path)
         return (
             f"[{status}] {self.steps_taken} steps in {self.elapsed_seconds:.1f}s\n"
             f"Path: {path_str}"
@@ -197,9 +197,10 @@ def traverse_wiki(
 
     target_title = url_to_title(target_url).lower()
     target_doc = nlp(target_title)
-    logger.info("Target: '%s'", target_title)
     logger.info("Start:  '%s'", url_to_title(start_url).lower())
+    logger.info("Target: '%s'", target_title)
     logger.info("Step limit: %d", step_limit)
+    logger.info("Beam width: %d\n", beam_width)
 
     # visited tracks every page we've extracted URLs from
     # so we don't visit a page more than once.
@@ -221,6 +222,9 @@ def traverse_wiki(
         if not frontier:
             logging.warning("Frontier is empty, no pages to explore.")
             break
+
+
+        logger.info(f"Step {step + 1}")
 
         candidate_urls_set: set[str] = set()
         for current_url in frontier:
@@ -247,10 +251,12 @@ def traverse_wiki(
             break
 
         for rank, (score, url) in enumerate(top_frontier_scorers, 1):
-            logger.info("Candidate #%d (%.4f) %s", rank, score, url_to_title(url))
+            if rank == len(top_frontier_scorers):
+                logger.info("Candidate #%d (%.4f) %s\n", rank, score, url_to_title(url))
+            else:
+                logger.info("Candidate #%d (%.4f) %s", rank, score, url_to_title(url))
 
         best_score, best_url = top_frontier_scorers[0]
-        logger.info("Best this step: `%s` (%.4f)", url_to_title(best_url), best_score)
 
         # Check if we found the target.
         # Normalize the best url casing.
